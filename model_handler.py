@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
 
-# Ensure NLTK stopwords
+# Ensure NLTK stopwords are available
 try:
     from nltk.corpus import stopwords
     STOPWORDS = set(stopwords.words("english"))
@@ -24,56 +24,69 @@ VECTORIZER_FILE = os.path.join(MODEL_DIR, "vectorizer.joblib")
 if not os.path.exists(MODEL_DIR):
     os.makedirs(MODEL_DIR)
 
-
 def clean_text(text):
     text = str(text).lower()
-    text = re.sub(r"http\\S+", "", text)
-    text = re.sub(r"[^a-z0-9\\s]", " ", text)
+    text = re.sub(r"http\S+", "", text)
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
     words = [w for w in text.split() if w not in STOPWORDS]
     return " ".join(words)
 
-
 def train_and_save_model():
-    """Train a model from SPAM.csv in a flexible way."""
+    """Train a model from spam.csv or SPAM.csv in a flexible, Render-safe way."""
     try:
-        # Try multiple encodings
-        encodings_to_try = ["utf-8", "latin-1", "ISO-8859-1"]
+        possible_files = ["spam.csv", "SPAM.csv", "Spam.csv"]
+        file_found = None
+
+        for fname in possible_files:
+            if os.path.exists(fname):
+                file_found = fname
+                break
+
+        if not file_found:
+            raise Exception("❌ Dataset file not found in project directory.")
+
+        print(f"📂 Loading dataset: {file_found}")
+
+        # Try reading with multiple encodings
         df = None
-        for enc in encodings_to_try:
+        for enc in ["utf-8", "latin-1", "ISO-8859-1"]:
             try:
-                df = pd.read_csv("spam.csv", encoding=enc, errors="ignore")
+                df = pd.read_csv(file_found, encoding=enc)
+                print(f"✅ Successfully loaded with encoding: {enc}")
                 break
             except Exception as e:
                 print(f"⚠️ Could not read with encoding {enc}: {e}")
 
         if df is None:
-            raise Exception("SPAM.csv could not be loaded with any encoding")
+            raise Exception(f"{file_found} could not be loaded with any encoding")
 
         # Drop empty columns and rows
         df = df.dropna(axis=1, how="all").dropna(axis=0, how="any")
 
-        # Try to find label and text columns automatically
+        # Normalize column names
         df.columns = [c.lower().strip() for c in df.columns]
+
         text_col = None
         label_col = None
-
         for c in df.columns:
-            if any(k in c.lower() for k in ["message", "text", "sms", "email"]):
+            if any(k in c for k in ["message", "text", "sms", "email"]):
                 text_col = c
-            if any(k in c.lower() for k in ["label", "spam", "target", "class"]):
+            if any(k in c for k in ["label", "spam", "target", "class", "category"]):
                 label_col = c
 
         if text_col is None or label_col is None:
-            raise Exception(f"Could not identify text/label columns. Found: {df.columns}")
+            raise Exception(f"❌ Could not identify text/label columns. Found: {df.columns}")
 
         print(f"✅ Using columns -> text: {text_col}, label: {label_col}")
 
-        # Clean text and train
+        # Clean and train model
         df[text_col] = df[text_col].astype(str).apply(clean_text)
         X = df[text_col]
         y = df[label_col]
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
 
         pipeline = Pipeline([
             ("tfidf", TfidfVectorizer()),
@@ -92,7 +105,6 @@ def train_and_save_model():
         print(f"❌ Error during training: {e}")
         raise
 
-
 def load_model_and_vectorizer():
     """Load saved model; train if missing."""
     try:
@@ -108,7 +120,6 @@ def load_model_and_vectorizer():
         print(f"❌ Failed to load model/vectorizer: {e}")
         raise
 
-
 def predict_sms(text):
     """Predict SPAM or NOT SPAM"""
     vec, model = load_model_and_vectorizer()
@@ -122,5 +133,3 @@ def predict_sms(text):
         prob = 0.0
 
     return {"label": str(pred).upper(), "probability": float(prob)}
-
-
