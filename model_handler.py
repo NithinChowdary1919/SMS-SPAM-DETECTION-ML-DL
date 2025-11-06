@@ -41,7 +41,7 @@ def train_and_save_model():
         df = None
         for enc in encodings_to_try:
             try:
-                df = pd.read_csv("SPAM.csv", encoding=enc, errors="ignore")
+                df = pd.read_csv("spam.csv", encoding=enc, errors="ignore")
                 break
             except Exception as e:
                 print(f"⚠️ Could not read with encoding {enc}: {e}")
@@ -122,4 +122,5 @@ def predict_sms(text):
         prob = 0.0
 
     return {"label": str(pred).upper(), "probability": float(prob)}
+
 
