@@ -59,20 +59,29 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------- LOTTIE ANIMATION --------------------
+# -------------------- LOTTIE ANIMATION (Safe Loader) --------------------
 def load_lottie_url(url: str):
     try:
         r = requests.get(url)
         if r.status_code == 200:
             return r.json()
-    except:
-        return None
+    except Exception as e:
+        print(f"⚠️ Could not load Lottie animation: {e}")
+    return None  # Return None if loading fails
 
-spam_anim = load_lottie_url("https://assets1.lottiefiles.com/packages/lf20_FxA3RF.json")
+# Try to load animation
+spam_anim = load_lottie_url("https://assets7.lottiefiles.com/packages/lf20_ydo1amjm.json")
 
-# -------------------- HEADER --------------------
-st.markdown("<h1 style='text-align:center;'>📩 SMS Spam Detection</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; font-size:18px;'>Detect whether a message is <b>Spam</b> or <b>Not Spam</b> using a trained ML model.</p>", unsafe_allow_html=True)
-st_lottie(spam_anim, height=200, key="spam-animation")
+# Display animation only if loaded
+if spam_anim:
+    from streamlit_lottie import st_lottie
+    st_lottie(spam_anim, height=200, key="spam-animation")
+else:
+    st.image(
+        "https://cdn-icons-png.flaticon.com/512/565/565547.png",
+        width=120,
+        caption="SMS Spam Detection"
+    )
 
 # -------------------- API URL --------------------
 API_URL = "https://sms-spam-detection-api.onrender.com/predict"
@@ -122,3 +131,4 @@ st.markdown("""
     <span style="font-size:13px; color:gray;">© 2025 Nithin Chowdary | SMS Spam Detection</span>
     </p>
 """, unsafe_allow_html=True)
+
