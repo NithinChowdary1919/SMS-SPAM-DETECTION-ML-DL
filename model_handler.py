@@ -1,117 +1,82 @@
 import os
 import joblib
 import pandas as pd
-import numpy as np
+import re
+import nltk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import accuracy_score
-import re
-import string
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
 
-# Download stopwords if not already available
+# Ensure stopwords are available
 try:
-    STOP = set(stopwords.words('english'))
+    from nltk.corpus import stopwords
+    STOPWORDS = set(stopwords.words("english"))
 except LookupError:
-    nltk.download('stopwords')
-    STOP = set(stopwords.words('english'))
+    nltk.download("stopwords")
+    from nltk.corpus import stopwords
+    STOPWORDS = set(stopwords.words("english"))
 
-ps = PorterStemmer()
+# Create a models directory
+if not os.path.exists("models"):
+    os.makedirs("models")
 
-MODEL_DIR = "models"
-VECTORIZER_FILE = os.path.join(MODEL_DIR, "vectorizer.joblib")
-MODEL_FILE = os.path.join(MODEL_DIR, "nb_model.joblib")
-
-# Create folder if missing
-if not os.path.exists(MODEL_DIR):
-    os.makedirs(MODEL_DIR)
+MODEL_FILE = "models/nb_model.joblib"
+VECTORIZER_FILE = "models/vectorizer.joblib"
 
 
-def clean_text(s: str) -> str:
-    """Clean text for ML processing"""
-    s = s.lower()
-    s = re.sub(r"http\\S+", "", s)
-    s = re.sub(r"[^a-z0-9\\s]", " ", s)
-    tokens = [ps.stem(word) for word in s.split() if word not in STOP]
-    return " ".join(tokens)
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r"http\\S+", "", text)
+    text = re.sub(r"[^a-z0-9\\s]", " ", text)
+    words = [w for w in text.split() if w not in STOPWORDS]
+    return " ".join(words)
 
 
-def train_default_model(dataset_path: str = None):
-    """Train a default TF-IDF + Naive Bayes model if no saved model exists."""
-    # Try to locate dataset file
-    if dataset_path is None:
-        possible = ["SPAM.csv", "spam.csv", "SMSSpamCollection", "dataset.csv"]
-        for f in possible:
-            if os.path.exists(f):
-                dataset_path = f
-                break
+def train_and_save_model():
+    """Train a simple model from SPAM.csv"""
+    df = pd.read_csv("SPAM.csv")
+    df.columns = [col.lower() for col in df.columns]
 
-    if dataset_path is None:
-        # Download sample dataset if none exists
-        import requests
-        url = "https://raw.githubusercontent.com/justmarkham/pycon-2016-tutorial/master/data/sms.tsv"
-        data = requests.get(url, timeout=10).content
-        open("sms.tsv", "wb").write(data)
-        dataset_path = "sms.tsv"
+    # Find the text and label columns automatically
+    text_col = [c for c in df.columns if "text" in c or "message" in c or "sms" in c][0]
+    label_col = [c for c in df.columns if "label" in c or "spam" in c or "class" in c][0]
 
-    # Load dataset
-    if dataset_path.endswith(".tsv"):
-        df = pd.read_csv(dataset_path, sep="\t", names=["label", "text"])
-    else:
-        df = pd.read_csv(dataset_path, encoding="latin-1")
+    df[text_col] = df[text_col].astype(str).apply(clean_text)
+    X = df[text_col]
+    y = df[label_col]
 
-    df["text"] = df["text"].astype(str).apply(clean_text)
-    X = df["text"]
-    y = df["label"]
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     pipeline = Pipeline([
         ("tfidf", TfidfVectorizer()),
         ("nb", MultinomialNB())
     ])
-    pipeline.fit(X_train, y_train)
 
-    # Save trained components
+    pipeline.fit(X_train, y_train)
     joblib.dump(pipeline.named_steps["tfidf"], VECTORIZER_FILE)
     joblib.dump(pipeline.named_steps["nb"], MODEL_FILE)
-
-    preds = pipeline.predict(X_test)
-    acc = accuracy_score(y_test, preds)
-    print(f"Model trained with accuracy: {acc:.4f}")
-    return acc
+    print("✅ Model trained successfully and saved.")
+    return pipeline
 
 
 def load_model_and_vectorizer():
-    """Load or train model + vectorizer"""
+    """Load the saved model; if not found, train it."""
     if os.path.exists(MODEL_FILE) and os.path.exists(VECTORIZER_FILE):
         vec = joblib.load(VECTORIZER_FILE)
         model = joblib.load(MODEL_FILE)
-        return vec, model
     else:
-        train_default_model()
-        vec = joblib.load(VECTORIZER_FILE)
-        model = joblib.load(MODEL_FILE)
-        return vec, model
+        pipe = train_and_save_model()
+        vec = pipe.named_steps["tfidf"]
+        model = pipe.named_steps["nb"]
+    return vec, model
 
 
-def predict_sms(text: str):
-    """Predict spam/ham from input text"""
+def predict_sms(text):
+    """Predict whether message is SPAM or NOT SPAM"""
     vec, model = load_model_and_vectorizer()
     cleaned = clean_text(text)
     X = vec.transform([cleaned])
-
-    try:
-        proba = model.predict_proba(X)[0]
-        spam_index = list(model.classes_).index("spam")
-        spam_prob = float(proba[spam_index])
-    except Exception:
-        pred = model.predict(X)[0]
-        spam_prob = 1.0 if str(pred).lower() == "spam" else 0.0
-
-    label = "SPAM" if spam_prob >= 0.5 else "NOT SPAM"
-    return {"label": label, "probability": spam_prob}
+    pred = model.predict(X)[0]
+    prob = model.predict_proba(X)[0][list(model.classes_).index(pred)]
+    return {"label": str(pred).upper(), "probability": float(prob)}
