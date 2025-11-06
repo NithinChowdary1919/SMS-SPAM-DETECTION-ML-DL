@@ -1,31 +1,38 @@
 import streamlit as st
 import requests
 
+st.set_page_config(page_title="SMS Spam Detection", page_icon="📩", layout="centered")
 
-st.set_page_config(page_title="SMS Spam Detector", page_icon="📩")
-st.title("SMS Spam Detection")
+st.title("📩 SMS Spam Detection App")
+st.write("This app uses a trained Machine Learning model deployed via FastAPI to predict whether a message is **Spam** or **Not Spam**.")
 
+st.divider()
 
-st.markdown("Enter an SMS text below and click Predict. This app calls the FastAPI backend to get predictions.")
+# API endpoint
+API_URL = "https://sms-spam-detection-api.onrender.com/predict"
 
+# Input text
+text_input = st.text_area("✉️ Enter your message:", placeholder="Type a message to check if it's spam or not...", height=150)
 
-text = st.text_area("Message", height=150)
+if st.button("🚀 Check Message"):
+    if text_input.strip() == "":
+        st.warning("Please enter a message to analyze.")
+    else:
+        try:
+            response = requests.post(API_URL, json={"text": text_input})
+            if response.status_code == 200:
+                result = response.json()
+                label = result.get("label", "Unknown")
+                prob = result.get("probability", 0)
 
+                if label == "SPAM":
+                    st.error(f"🚨 **Spam Detected!** (Probability: {prob:.2f})")
+                else:
+                    st.success(f"✅ **Not Spam** (Confidence: {prob:.2f})")
 
-api_url = st.text_input("API URL (keep blank for local http://localhost:8000)", value="http://localhost:8000")
+            else:
+                st.error(f"API returned an error: {response.status_code}")
+        except Exception as e:
+            st.error(f"Error contacting API: {e}")
 
-
-if st.button("Predict"):
-if text.strip()=="":
-st.warning("Please enter a message to classify.")
-else:
-try:
-resp = requests.post(f"{api_url}/predict", json={"text": text}, timeout=10)
-if resp.status_code==200:
-data = resp.json()
-st.success(f"Prediction: {data['label']}")
-st.info(f"Spam probability: {data['probability']:.4f}")
-else:
-st.error(f"API error: {resp.status_code} {resp.text}")
-except Exception as e:
-st.error(f"Request failed: {e}")
+st.caption("Powered by Streamlit + FastAPI 🚀 | Developed by Nithin Chowdary")
