@@ -58,9 +58,9 @@ def train_and_save_model():
         label_col = None
 
         for c in df.columns:
-            if any(k in c for k in ["message", "text", "sms", "email"]):
+            if any(k in c.lower() for k in ["message", "text", "sms", "email"]):
                 text_col = c
-            if any(k in c for k in ["label", "spam", "target", "class"]):
+            if any(k in c.lower() for k in ["label", "spam", "target", "class"]):
                 label_col = c
 
         if text_col is None or label_col is None:
@@ -122,3 +122,4 @@ def predict_sms(text):
         prob = 0.0
 
     return {"label": str(pred).upper(), "probability": float(prob)}
+
