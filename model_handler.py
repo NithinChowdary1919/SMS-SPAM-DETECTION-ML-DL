@@ -35,7 +35,7 @@ def clean_text(text):
 
 def train_and_save_model():
     """Train a simple model from SPAM.csv"""
-    df = pd.read_csv("SPAM.csv")
+    df = pd.read_csv("SPAM.csv", encoding="latin-1", errors="ignore")
     df.columns = [col.lower() for col in df.columns]
 
     # Find the text and label columns automatically
@@ -80,3 +80,4 @@ def predict_sms(text):
     pred = model.predict(X)[0]
     prob = model.predict_proba(X)[0][list(model.classes_).index(pred)]
     return {"label": str(pred).upper(), "probability": float(prob)}
+
