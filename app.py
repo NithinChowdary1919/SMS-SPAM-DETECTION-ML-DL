@@ -1,38 +1,124 @@
 import streamlit as st
 import requests
+from streamlit_lottie import st_lottie
+import json
 
-st.set_page_config(page_title="SMS Spam Detection", page_icon="📩", layout="centered")
+# -------------------- PAGE CONFIG --------------------
+st.set_page_config(
+    page_title="SMS Spam Detection",
+    page_icon="📩",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
-st.title("📩 SMS Spam Detection App")
-st.write("This app uses a trained Machine Learning model deployed via FastAPI to predict whether a message is **Spam** or **Not Spam**.")
+# -------------------- STYLING --------------------
+st.markdown("""
+    <style>
+        .main {
+            background: linear-gradient(135deg, #f0f2f6, #d9e4f5);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0px 4px 20px rgba(0,0,0,0.15);
+        }
+        .stTextArea textarea {
+            border-radius: 12px !important;
+            border: 1px solid #5a5a5a !important;
+            font-size: 16px !important;
+            padding: 1rem !important;
+        }
+        .stButton>button {
+            background-color: #2563eb;
+            color: white;
+            border-radius: 10px;
+            padding: 0.75rem 1.5rem;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+        .stButton>button:hover {
+            background-color: #1e40af;
+            transform: scale(1.05);
+        }
+        .result-box {
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 1.2rem;
+            margin-top: 1rem;
+        }
+        .spam {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 2px solid #b91c1c;
+        }
+        .ham {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 2px solid #166534;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-st.divider()
+# -------------------- LOTTIE ANIMATION --------------------
+def load_lottie_url(url: str):
+    try:
+        r = requests.get(url)
+        if r.status_code == 200:
+            return r.json()
+    except:
+        return None
 
-# API endpoint
+spam_anim = load_lottie_url("https://assets1.lottiefiles.com/packages/lf20_FxA3RF.json")
+
+# -------------------- HEADER --------------------
+st.markdown("<h1 style='text-align:center;'>📩 SMS Spam Detection</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; font-size:18px;'>Detect whether a message is <b>Spam</b> or <b>Not Spam</b> using a trained ML model.</p>", unsafe_allow_html=True)
+st_lottie(spam_anim, height=200, key="spam-animation")
+
+# -------------------- API URL --------------------
 API_URL = "https://sms-spam-detection-api.onrender.com/predict"
 
-# Input text
-text_input = st.text_area("✉️ Enter your message:", placeholder="Type a message to check if it's spam or not...", height=150)
+# -------------------- INPUT AREA --------------------
+with st.container():
+    st.markdown("<div class='main'>", unsafe_allow_html=True)
+    text_input = st.text_area(
+        "✉️ Enter your message:",
+        placeholder="Type your message here...",
+        height=150
+    )
 
-if st.button("🚀 Check Message"):
-    if text_input.strip() == "":
-        st.warning("Please enter a message to analyze.")
-    else:
-        try:
-            response = requests.post(API_URL, json={"text": text_input})
-            if response.status_code == 200:
-                result = response.json()
-                label = result.get("label", "Unknown")
-                prob = result.get("probability", 0)
+    if st.button("🚀 Analyze Message"):
+        if text_input.strip() == "":
+            st.warning("Please enter a message to analyze.")
+        else:
+            try:
+                response = requests.post(API_URL, json={"text": text_input})
+                if response.status_code == 200:
+                    result = response.json()
+                    label = result.get("label", "Unknown")
+                    prob = result.get("probability", 0)
 
-                if label == "SPAM":
-                    st.error(f"🚨 **Spam Detected!** (Probability: {prob:.2f})")
+                    if label == "SPAM":
+                        st.markdown(
+                            f"<div class='result-box spam'>🚨 <b>Spam Detected!</b><br>Probability: {prob:.2f}</div>",
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(
+                            f"<div class='result-box ham'>✅ <b>Not Spam</b><br>Confidence: {prob:.2f}</div>",
+                            unsafe_allow_html=True
+                        )
                 else:
-                    st.success(f"✅ **Not Spam** (Confidence: {prob:.2f})")
+                    st.error(f"API Error: {response.status_code}")
+            except Exception as e:
+                st.error(f"Error connecting to API: {e}")
 
-            else:
-                st.error(f"API returned an error: {response.status_code}")
-        except Exception as e:
-            st.error(f"Error contacting API: {e}")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-st.caption("Powered by Streamlit + FastAPI 🚀 | Developed by Nithin Chowdary")
+# -------------------- FOOTER --------------------
+st.markdown("""
+    <hr>
+    <p style="text-align:center; font-size:15px;">
+    Built with ❤️ using <b>Streamlit</b> & <b>FastAPI</b><br>
+    <span style="font-size:13px; color:gray;">© 2025 Nithin Chowdary | SMS Spam Detection</span>
+    </p>
+""", unsafe_allow_html=True)
