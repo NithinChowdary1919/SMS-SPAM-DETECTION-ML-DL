@@ -8,7 +8,7 @@ app = FastAPI(title="SMS Spam Detection API")
 
 
 class Message(BaseModel):
-text: str
+    text: str
 
 
 @app.get("/")
@@ -20,3 +20,4 @@ return {"message": "SMS Spam Detection API. POST /predict with {text}."}
 def predict(message: Message):
 res = predict_sms(message.text)
 return res
+
